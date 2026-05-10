@@ -23,5 +23,10 @@ class Settings(BaseSettings):
     max_file_bytes: int = 100 * 1024 * 1024
     max_submission_bytes: int = 500 * 1024 * 1024
 
+    n8n_webhook_url: str | None = None
+    n8n_webhook_secret: str | None = None
+    callback_secret: str
+    public_api_base_url: str = "http://localhost:8000"
+
 
 settings = Settings()
