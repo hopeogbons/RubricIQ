@@ -1,10 +1,14 @@
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Index, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
+
+if TYPE_CHECKING:
+    from app.models.evaluation import Evaluation
 
 
 class EvaluationScore(Base):
@@ -23,3 +27,5 @@ class EvaluationScore(Base):
     score: Mapped[float] = mapped_column(Numeric, nullable=False)
     max_score: Mapped[float] = mapped_column(Numeric, nullable=False)
     explanation: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    evaluation: Mapped["Evaluation"] = relationship(back_populates="scores")

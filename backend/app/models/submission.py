@@ -18,6 +18,7 @@ from app.models.base import Base
 if TYPE_CHECKING:
     from app.models.evaluation import Evaluation
     from app.models.learner import Learner
+    from app.models.submission_artifact import SubmissionArtifact
 
 
 class Submission(Base):
@@ -66,4 +67,10 @@ class Submission(Base):
         single_parent=True,
         uselist=False,
         lazy="joined",
+    )
+    artifacts: Mapped[list["SubmissionArtifact"]] = relationship(
+        back_populates="submission",
+        cascade="all, delete-orphan",
+        order_by="SubmissionArtifact.created_at",
+        lazy="selectin",
     )

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
+    from app.models.evaluation_score import EvaluationScore
     from app.models.submission import Submission
 
 
@@ -32,3 +33,9 @@ class Evaluation(Base):
     )
 
     submission: Mapped["Submission"] = relationship(back_populates="evaluation")
+    scores: Mapped[list["EvaluationScore"]] = relationship(
+        back_populates="evaluation",
+        cascade="all, delete-orphan",
+        order_by="EvaluationScore.criterion",
+        lazy="selectin",
+    )
