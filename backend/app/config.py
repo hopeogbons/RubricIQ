@@ -28,5 +28,10 @@ class Settings(BaseSettings):
     callback_secret: str
     public_api_base_url: str = "http://localhost:8000"
 
+    cleanup_enabled: bool = True
+    cleanup_interval_minutes: int = 60
+    artifact_ttl_hours: int = 6
+    stuck_after_minutes: int = 30
+
 
 settings = Settings()
