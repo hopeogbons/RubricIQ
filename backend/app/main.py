@@ -14,6 +14,9 @@ from app.db import SessionLocal
 from app.deps import get_db
 from app.routers.auth import limiter as auth_limiter
 from app.routers.auth import router as auth_router
+from app.routers.learners import flat_router as learners_flat_router
+from app.routers.learners import nested_router as learners_nested_router
+from app.routers.rubrics import router as rubrics_router
 from app.services.auth_service import seed_superadmin
 
 logger = logging.getLogger(__name__)
@@ -44,6 +47,9 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(rubrics_router)
+app.include_router(learners_nested_router)
+app.include_router(learners_flat_router)
 
 
 @app.get("/health")
