@@ -65,6 +65,7 @@ def require_roles(*roles: str) -> Callable[[User], User]:
 
 require_admin = require_roles("admin", "superadmin")
 require_superadmin = require_roles("superadmin")
+require_admin_or_evaluator = require_roles("admin", "superadmin", "evaluator")
 
 
 __all__: Iterable[str] = [
@@ -75,4 +76,5 @@ __all__: Iterable[str] = [
     "require_roles",
     "require_admin",
     "require_superadmin",
+    "require_admin_or_evaluator",
 ]
