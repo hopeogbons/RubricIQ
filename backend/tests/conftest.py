@@ -34,6 +34,8 @@ os.environ.setdefault(
     "CALLBACK_SECRET", "test-callback-secret-32-bytes-distinct-from-others"
 )
 os.environ.setdefault("PUBLIC_API_BASE_URL", "http://localhost:8000")
+# No background scheduler in tests; we invoke cleanup functions directly.
+os.environ.setdefault("CLEANUP_ENABLED", "false")
 # N8N_WEBHOOK_URL intentionally unset; tests override the n8n client dependency.
 # RESEND_API_KEY intentionally unset; tests override the email client dependency.
 
