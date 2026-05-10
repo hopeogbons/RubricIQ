@@ -1,5 +1,7 @@
 import logging
 import shutil
+from collections.abc import Iterator
+from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import BinaryIO
@@ -84,6 +86,20 @@ class LocalArtifactStorage:
         path = self._submission_dir(submission_id)
         if path.is_dir():
             shutil.rmtree(path, ignore_errors=True)
+
+    def iter_submission_dirs(self) -> Iterator[tuple[Path, datetime]]:
+        """Yield (path, mtime_aware) for each direct subdirectory of the artifact root.
+        Tolerates a missing root and skips non-directory entries."""
+        if not self.root.is_dir():
+            return
+        for child in self.root.iterdir():
+            if not child.is_dir():
+                continue
+            try:
+                mtime = datetime.fromtimestamp(child.stat().st_mtime, tz=UTC)
+            except OSError:
+                continue
+            yield child, mtime
 
 
 @lru_cache(maxsize=1)
