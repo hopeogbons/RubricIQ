@@ -23,6 +23,7 @@ from app.routers.submissions import nested_router as submissions_nested_router
 from app.routers.submissions import router as submissions_router
 from app.routers.webhooks import router as webhooks_router
 from app.services.auth_service import seed_superadmin
+from app.tasks.scheduler import shutdown_scheduler, start_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,13 @@ async def lifespan(app: FastAPI):
         seed_superadmin(db, settings)
     finally:
         db.close()
-    yield
+    if settings.cleanup_enabled:
+        start_scheduler()
+    try:
+        yield
+    finally:
+        if settings.cleanup_enabled:
+            shutdown_scheduler()
 
 
 app = FastAPI(title="RubricIQ API", version="0.1.0", lifespan=lifespan)
