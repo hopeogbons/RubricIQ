@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { RubricDetailPage } from "@/pages/RubricDetailPage";
+import type { RubricChartStats } from "@/lib/dashboard";
 import type { Learner } from "@/lib/learners";
 import { API_BASE, Providers, loginAs } from "@/test/helpers";
 import { server } from "@/test/msw-server";
@@ -44,6 +45,33 @@ function mockLearners(learners: Learner[]): void {
   );
 }
 
+const EMPTY_CHART_STATS: RubricChartStats = {
+  rubric_id: ID,
+  average_total_score: null,
+  average_max_total: null,
+  score_distribution: [
+    { bucket: "0-10%", count: 0 },
+    { bucket: "10-20%", count: 0 },
+    { bucket: "20-30%", count: 0 },
+    { bucket: "30-40%", count: 0 },
+    { bucket: "40-50%", count: 0 },
+    { bucket: "50-60%", count: 0 },
+    { bucket: "60-70%", count: 0 },
+    { bucket: "70-80%", count: 0 },
+    { bucket: "80-90%", count: 0 },
+    { bucket: "90-100%", count: 0 },
+  ],
+  criterion_averages: [],
+};
+
+function mockChartStats(stats: RubricChartStats = EMPTY_CHART_STATS): void {
+  server.use(
+    http.get(`${API_BASE}/dashboard/rubrics/${ID}/stats`, () =>
+      HttpResponse.json(stats),
+    ),
+  );
+}
+
 function renderApp(path = `/rubrics/${ID}`): void {
   render(
     <Providers initialEntries={[path]}>
@@ -75,6 +103,7 @@ describe("RubricDetailPage", () => {
     loginAs({ role: "viewer" });
     mockRubric();
     mockLearners([]);
+    mockChartStats();
 
     renderApp();
     await waitFor(() => {
@@ -86,6 +115,10 @@ describe("RubricDetailPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("learners-empty")).toBeInTheDocument();
     });
+    await waitFor(() => {
+      expect(screen.getByTestId("score-histogram-empty")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("criterion-averages-empty")).toBeInTheDocument();
     expect(screen.queryByTestId("add-learner-button")).not.toBeInTheDocument();
   });
 
@@ -93,6 +126,7 @@ describe("RubricDetailPage", () => {
     loginAs({ role: "evaluator" });
     mockRubric();
     mockLearners([LEARNER]);
+    mockChartStats();
 
     renderApp();
     const row = await screen.findByTestId(`learner-row-${LEARNER.id}`);
@@ -110,6 +144,7 @@ describe("RubricDetailPage", () => {
     loginAs({ role: "admin" });
     mockRubric();
     mockLearners([]);
+    mockChartStats();
 
     renderApp();
     await waitFor(() => {
@@ -124,10 +159,49 @@ describe("RubricDetailPage", () => {
         HttpResponse.json({ detail: "Rubric not found" }, { status: 404 }),
       ),
       http.get(`${API_BASE}/rubrics/${ID}/learners`, () => HttpResponse.json([])),
+      http.get(`${API_BASE}/dashboard/rubrics/${ID}/stats`, () =>
+        HttpResponse.json(EMPTY_CHART_STATS),
+      ),
     );
     renderApp();
     await waitFor(() => {
       expect(screen.getByTestId("rubric-not-found")).toBeInTheDocument();
     });
+  });
+
+  it("renders charts and average score when stats arrive", async () => {
+    loginAs({ role: "admin" });
+    mockRubric();
+    mockLearners([]);
+    mockChartStats({
+      rubric_id: ID,
+      average_total_score: 8,
+      average_max_total: 10,
+      score_distribution: [
+        { bucket: "0-10%", count: 0 },
+        { bucket: "10-20%", count: 0 },
+        { bucket: "20-30%", count: 1 },
+        { bucket: "30-40%", count: 0 },
+        { bucket: "40-50%", count: 0 },
+        { bucket: "50-60%", count: 0 },
+        { bucket: "60-70%", count: 0 },
+        { bucket: "70-80%", count: 2 },
+        { bucket: "80-90%", count: 1 },
+        { bucket: "90-100%", count: 0 },
+      ],
+      criterion_averages: [
+        { criterion: "Clarity", average: 4, max_score_average: 5, count: 4 },
+        { criterion: "Depth", average: 3, max_score_average: 5, count: 4 },
+      ],
+    });
+    renderApp();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("stat-average-total")).toHaveTextContent("8 / 10");
+    });
+    expect(await screen.findByTestId("score-histogram")).toBeInTheDocument();
+    expect(screen.getByTestId("criterion-averages-chart")).toBeInTheDocument();
+    expect(screen.queryByTestId("score-histogram-empty")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("criterion-averages-empty")).not.toBeInTheDocument();
   });
 });
