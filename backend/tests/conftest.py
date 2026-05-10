@@ -30,6 +30,11 @@ os.environ.setdefault("ARTIFACT_DIR", _TEST_ARTIFACT_DIR)
 # Smaller test limits keep size-limit tests cheap (10 KB / 50 KB).
 os.environ.setdefault("MAX_FILE_BYTES", str(10 * 1024))
 os.environ.setdefault("MAX_SUBMISSION_BYTES", str(50 * 1024))
+os.environ.setdefault(
+    "CALLBACK_SECRET", "test-callback-secret-32-bytes-distinct-from-others"
+)
+os.environ.setdefault("PUBLIC_API_BASE_URL", "http://localhost:8000")
+# N8N_WEBHOOK_URL intentionally unset; tests override the n8n client dependency.
 # RESEND_API_KEY intentionally unset; tests override the email client dependency.
 
 _pg_executable = shutil.which("pg_ctl") or f"{PG_BIN}/pg_ctl"
@@ -144,20 +149,38 @@ def recording_email_client() -> RecordingEmailClient:
     return RecordingEmailClient()
 
 
+class RecordingN8nClient:
+    def __init__(self) -> None:
+        self.payloads: list[dict[str, Any]] = []
+        self.fail_with: Exception | None = None
+
+    def trigger(self, payload: dict[str, Any]) -> None:
+        self.payloads.append(payload)
+        if self.fail_with is not None:
+            raise self.fail_with
+
+
 @pytest.fixture()
-def client(database_url, db_session, recording_email_client):
+def recording_n8n_client() -> RecordingN8nClient:
+    return RecordingN8nClient()
+
+
+@pytest.fixture()
+def client(database_url, db_session, recording_email_client, recording_n8n_client):
     from fastapi.testclient import TestClient
 
     from app.deps import get_db
     from app.main import app
     from app.routers.auth import limiter
     from app.services.email_service import get_email_client
+    from app.services.n8n_service import get_n8n_client
 
     def _override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_email_client] = lambda: recording_email_client
+    app.dependency_overrides[get_n8n_client] = lambda: recording_n8n_client
     limiter.reset()
 
     with TestClient(app) as c:
