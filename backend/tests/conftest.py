@@ -1,5 +1,6 @@
 import os
 import shutil
+import tempfile
 from collections.abc import Generator
 from datetime import UTC
 from typing import Any
@@ -21,6 +22,14 @@ os.environ.setdefault("JWT_EXPIRES_MINUTES", "60")
 os.environ.setdefault("SUPERADMIN_EMAIL", "seeded-admin@example.com")
 os.environ.setdefault("SUPERADMIN_PASSWORD", "seeded-admin-pw")
 os.environ.setdefault("FRONTEND_BASE_URL", "http://localhost:5173")
+os.environ.setdefault(
+    "ARTIFACT_SIGNING_SECRET", "test-artifact-secret-32-bytes-minimum-distinct-from-jwt"
+)
+_TEST_ARTIFACT_DIR = tempfile.mkdtemp(prefix="rubriciq-test-artifacts-")
+os.environ.setdefault("ARTIFACT_DIR", _TEST_ARTIFACT_DIR)
+# Smaller test limits keep size-limit tests cheap (10 KB / 50 KB).
+os.environ.setdefault("MAX_FILE_BYTES", str(10 * 1024))
+os.environ.setdefault("MAX_SUBMISSION_BYTES", str(50 * 1024))
 # RESEND_API_KEY intentionally unset; tests override the email client dependency.
 
 _pg_executable = shutil.which("pg_ctl") or f"{PG_BIN}/pg_ctl"
@@ -190,6 +199,35 @@ def make_user(db_session):
         return user, password
 
     return _create
+
+
+@pytest.fixture()
+def make_submission(db_session):
+    """Build a Submission. If learner is None, also creates one under the rubric."""
+    from app.models import Learner, Submission
+
+    def _make(rubric, *, learner=None, status: str = "draft", created_by=None):
+        if learner is None:
+            learner = Learner(rubric_id=rubric.id, full_name="Auto Learner")
+            db_session.add(learner)
+            db_session.flush()
+        sub = Submission(
+            learner_id=learner.id,
+            rubric_id=rubric.id,
+            status=status,
+            created_by=created_by,
+        )
+        db_session.add(sub)
+        db_session.flush()
+        return sub
+
+    return _make
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _cleanup_artifact_dir():
+    yield
+    shutil.rmtree(_TEST_ARTIFACT_DIR, ignore_errors=True)
 
 
 @pytest.fixture()
