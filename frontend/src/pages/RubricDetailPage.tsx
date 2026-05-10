@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -12,16 +12,116 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { extractErrorMessage } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import {
+  learnersByRubricKey,
+  listLearners,
+  type Learner,
+} from "@/lib/learners";
 import { formatCompletionRate, getRubric, rubricKey } from "@/lib/rubrics";
 
 function isNotFound(error: unknown): boolean {
   return axios.isAxiosError(error) && error.response?.status === 404;
 }
 
+function canAddLearner(role: string): boolean {
+  return role === "admin" || role === "superadmin" || role === "evaluator";
+}
+
+function formatDate(value: string): string {
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString();
+}
+
+interface LearnersSectionProps {
+  rubricId: string;
+  canAdd: boolean;
+}
+
+function LearnersSection({ rubricId, canAdd }: LearnersSectionProps): JSX.Element {
+  const navigate = useNavigate();
+  const { data, isLoading, error } = useQuery({
+    queryKey: learnersByRubricKey(rubricId),
+    queryFn: () => listLearners(rubricId),
+  });
+
+  return (
+    <Card data-testid="learners-section">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle>Learners</CardTitle>
+          <CardDescription>People being evaluated against this rubric.</CardDescription>
+        </div>
+        {canAdd ? (
+          <Button asChild data-testid="add-learner-button">
+            <Link to={`/rubrics/${rubricId}/learners/new`}>Add learner</Link>
+          </Button>
+        ) : null}
+      </CardHeader>
+      <CardContent>
+        {error ? (
+          <Alert variant="destructive" data-testid="learners-error">
+            <AlertDescription>
+              {extractErrorMessage(error, "Failed to load learners.")}
+            </AlertDescription>
+          </Alert>
+        ) : isLoading ? (
+          <div className="space-y-2" data-testid="learners-loading">
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+          </div>
+        ) : !data || data.length === 0 ? (
+          <p className="text-sm text-muted-foreground" data-testid="learners-empty">
+            No learners yet.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Cohort</TableHead>
+                <TableHead>Added</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.map((learner: Learner) => (
+                <TableRow
+                  key={learner.id}
+                  data-testid={`learner-row-${learner.id}`}
+                  className="cursor-pointer"
+                  onClick={() => navigate(`/learners/${learner.id}`)}
+                >
+                  <TableCell className="font-medium">{learner.full_name}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {learner.email ?? "-"}
+                  </TableCell>
+                  <TableCell>{learner.cohort ?? "-"}</TableCell>
+                  <TableCell>{formatDate(learner.created_at)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function RubricDetailPage(): JSX.Element {
   const params = useParams<{ id: string }>();
   const id = params.id ?? "";
+  const { user } = useAuth();
+  const canAdd = user ? canAddLearner(user.role) : false;
 
   const { data, isLoading, error } = useQuery({
     queryKey: rubricKey(id),
@@ -125,17 +225,7 @@ export function RubricDetailPage(): JSX.Element {
         </Card>
       </section>
 
-      <Card data-testid="learners-placeholder">
-        <CardHeader>
-          <CardTitle>Learners</CardTitle>
-          <CardDescription>
-            The learner table and add-learner flow ship in the next step.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Coming soon.
-        </CardContent>
-      </Card>
+      <LearnersSection rubricId={id} canAdd={canAdd} />
     </div>
   );
 }
