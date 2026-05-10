@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     TIMESTAMP,
@@ -10,9 +11,13 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
+
+if TYPE_CHECKING:
+    from app.models.evaluation import Evaluation
+    from app.models.learner import Learner
 
 
 class Submission(Base):
@@ -52,4 +57,13 @@ class Submission(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    learner: Mapped["Learner"] = relationship(back_populates="submissions")
+    evaluation: Mapped["Evaluation | None"] = relationship(
+        back_populates="submission",
+        cascade="all, delete-orphan",
+        single_parent=True,
+        uselist=False,
+        lazy="joined",
     )
