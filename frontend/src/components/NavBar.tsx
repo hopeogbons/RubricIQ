@@ -1,6 +1,7 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 
 export function NavBar(): JSX.Element {
@@ -15,9 +16,26 @@ export function NavBar(): JSX.Element {
   return (
     <header className="border-b">
       <div className="container flex h-14 items-center justify-between">
-        <Link to="/" className="font-semibold">
-          RubricIQ
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link to="/" className="font-semibold">
+            RubricIQ
+          </Link>
+          {status === "authenticated" ? (
+            <nav className="flex items-center gap-4 text-sm">
+              <NavLink
+                to="/rubrics"
+                className={({ isActive }) =>
+                  cn(
+                    "text-muted-foreground hover:text-foreground",
+                    isActive && "text-foreground",
+                  )
+                }
+              >
+                Rubrics
+              </NavLink>
+            </nav>
+          ) : null}
+        </div>
         <nav className="flex items-center gap-3">
           {status === "authenticated" && user ? (
             <>
