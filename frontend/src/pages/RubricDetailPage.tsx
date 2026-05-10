@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+import { CriterionAveragesChart } from "@/components/charts/CriterionAveragesChart";
+import { ScoreHistogram } from "@/components/charts/ScoreHistogram";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,11 +25,16 @@ import {
 import { extractErrorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
+  getRubricChartStats,
+  rubricChartStatsKey,
+} from "@/lib/dashboard";
+import {
   learnersByRubricKey,
   listLearners,
   type Learner,
 } from "@/lib/learners";
 import { formatCompletionRate, getRubric, rubricKey } from "@/lib/rubrics";
+import { formatScore } from "@/lib/submissions";
 
 function isNotFound(error: unknown): boolean {
   return axios.isAxiosError(error) && error.response?.status === 404;
@@ -198,7 +205,7 @@ export function RubricDetailPage(): JSX.Element {
         ) : null}
       </header>
 
-      <section className="mb-8 grid grid-cols-3 gap-4">
+      <section className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Learners</CardDescription>
@@ -223,9 +230,80 @@ export function RubricDetailPage(): JSX.Element {
             </CardTitle>
           </CardHeader>
         </Card>
+        <ChartAverageScoreCard rubricId={id} />
       </section>
+
+      <ChartsSection rubricId={id} />
 
       <LearnersSection rubricId={id} canAdd={canAdd} />
     </div>
+  );
+}
+
+function ChartAverageScoreCard({ rubricId }: { rubricId: string }): JSX.Element {
+  const { data, isLoading } = useQuery({
+    queryKey: rubricChartStatsKey(rubricId),
+    queryFn: () => getRubricChartStats(rubricId),
+  });
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardDescription>Avg total score</CardDescription>
+        <CardTitle className="text-3xl" data-testid="stat-average-total">
+          {isLoading ? "..." : formatScore(data?.average_total_score ?? null, data?.average_max_total ?? null)}
+        </CardTitle>
+      </CardHeader>
+    </Card>
+  );
+}
+
+function ChartsSection({ rubricId }: { rubricId: string }): JSX.Element {
+  const { data, isLoading, error } = useQuery({
+    queryKey: rubricChartStatsKey(rubricId),
+    queryFn: () => getRubricChartStats(rubricId),
+  });
+
+  return (
+    <section
+      className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2"
+      data-testid="charts-section"
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle>Score distribution</CardTitle>
+          <CardDescription>
+            Total score as a percentage of the rubric max.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error ? (
+            <Alert variant="destructive" data-testid="charts-error">
+              <AlertDescription>
+                {extractErrorMessage(error, "Failed to load chart data.")}
+              </AlertDescription>
+            </Alert>
+          ) : isLoading || !data ? (
+            <Skeleton className="h-64 w-full" data-testid="histogram-loading" />
+          ) : (
+            <ScoreHistogram buckets={data.score_distribution} />
+          )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Per-criterion averages</CardTitle>
+          <CardDescription>
+            Average score for each rubric criterion across completed submissions.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error ? null : isLoading || !data ? (
+            <Skeleton className="h-64 w-full" data-testid="criterion-loading" />
+          ) : (
+            <CriterionAveragesChart averages={data.criterion_averages} />
+          )}
+        </CardContent>
+      </Card>
+    </section>
   );
 }

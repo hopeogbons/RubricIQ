@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { NavBar } from "@/components/NavBar";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AccountPage } from "@/pages/AccountPage";
+import { DashboardPage } from "@/pages/DashboardPage";
 import { LearnerDetailPage } from "@/pages/LearnerDetailPage";
 import { LearnerNewPage } from "@/pages/LearnerNewPage";
 import { LoginPage } from "@/pages/LoginPage";
@@ -57,6 +58,14 @@ export function App(): JSX.Element {
             element={
               <ProtectedRoute>
                 <LearnerDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
               </ProtectedRoute>
             }
           />

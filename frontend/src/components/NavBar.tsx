@@ -4,6 +4,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 
+function isAdminRole(role: string): boolean {
+  return role === "admin" || role === "superadmin";
+}
+
 export function NavBar(): JSX.Element {
   const { status, user, logout } = useAuth();
   const navigate = useNavigate();
@@ -33,6 +37,20 @@ export function NavBar(): JSX.Element {
               >
                 Rubrics
               </NavLink>
+              {user && isAdminRole(user.role) ? (
+                <NavLink
+                  to="/dashboard"
+                  data-testid="nav-dashboard-link"
+                  className={({ isActive }) =>
+                    cn(
+                      "text-muted-foreground hover:text-foreground",
+                      isActive && "text-foreground",
+                    )
+                  }
+                >
+                  Dashboard
+                </NavLink>
+              ) : null}
             </nav>
           ) : null}
         </div>
