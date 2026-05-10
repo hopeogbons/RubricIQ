@@ -18,5 +18,10 @@ class Settings(BaseSettings):
     resend_from_email: str = "RubricIQ <noreply@rubriciq.com>"
     frontend_base_url: str = "http://localhost:5173"
 
+    artifact_dir: str = "/data/artifacts"
+    artifact_signing_secret: str
+    max_file_bytes: int = 100 * 1024 * 1024
+    max_submission_bytes: int = 500 * 1024 * 1024
+
 
 settings = Settings()
