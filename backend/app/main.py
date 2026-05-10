@@ -21,6 +21,7 @@ from app.routers.learners import nested_router as learners_nested_router
 from app.routers.rubrics import router as rubrics_router
 from app.routers.submissions import nested_router as submissions_nested_router
 from app.routers.submissions import router as submissions_router
+from app.routers.webhooks import router as webhooks_router
 from app.services.auth_service import seed_superadmin
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,7 @@ app.include_router(submissions_nested_router)
 app.include_router(submissions_router)
 app.include_router(artifacts_nested_router)
 app.include_router(artifacts_flat_router)
+app.include_router(webhooks_router)
 
 
 @app.get("/health")
