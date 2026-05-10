@@ -16,6 +16,7 @@ from app.routers.artifacts import flat_router as artifacts_flat_router
 from app.routers.artifacts import nested_router as artifacts_nested_router
 from app.routers.auth import limiter as auth_limiter
 from app.routers.auth import router as auth_router
+from app.routers.dashboard import router as dashboard_router
 from app.routers.learners import flat_router as learners_flat_router
 from app.routers.learners import nested_router as learners_nested_router
 from app.routers.rubrics import router as rubrics_router
@@ -67,6 +68,7 @@ app.include_router(submissions_router)
 app.include_router(artifacts_nested_router)
 app.include_router(artifacts_flat_router)
 app.include_router(webhooks_router)
+app.include_router(dashboard_router)
 
 
 @app.get("/health")
