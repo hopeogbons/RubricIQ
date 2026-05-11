@@ -1,0 +1,51 @@
+name: Terraform apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - ".github/workflows/terraform-apply.yml"
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  # Do not cancel an in-flight apply; let it finish.
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    # Configure the `production` environment in the repo settings with
+    # required reviewers to gate this job behind a manual approval.
+    environment: production
+    defaults:
+      run:
+        working-directory: infra
+    env:
+      TF_VAR_railway_token: ${{ secrets.TF_VAR_RAILWAY_TOKEN }}
+      TF_VAR_jwt_secret: ${{ secrets.TF_VAR_JWT_SECRET }}
+      TF_VAR_artifact_signing_secret: ${{ secrets.TF_VAR_ARTIFACT_SIGNING_SECRET }}
+      TF_VAR_callback_secret: ${{ secrets.TF_VAR_CALLBACK_SECRET }}
+      TF_VAR_n8n_webhook_url: ${{ secrets.TF_VAR_N8N_WEBHOOK_URL }}
+      TF_VAR_n8n_webhook_secret: ${{ secrets.TF_VAR_N8N_WEBHOOK_SECRET }}
+      TF_VAR_superadmin_email: ${{ secrets.TF_VAR_SUPERADMIN_EMAIL }}
+      TF_VAR_superadmin_password: ${{ secrets.TF_VAR_SUPERADMIN_PASSWORD }}
+      TF_VAR_resend_api_key: ${{ secrets.TF_VAR_RESEND_API_KEY }}
+      TF_VAR_public_api_base_url: ${{ secrets.TF_VAR_PUBLIC_API_BASE_URL }}
+      TF_VAR_frontend_base_url: ${{ secrets.TF_VAR_FRONTEND_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.0"
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Init
+        run: terraform init -input=false
+
+      - name: Apply
+        run: terraform apply -auto-approve -input=false

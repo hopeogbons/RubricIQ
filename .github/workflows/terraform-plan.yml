@@ -1,0 +1,67 @@
+name: Terraform plan
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - ".github/workflows/terraform-plan.yml"
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    env:
+      # TF_VAR_* are surfaced from repo secrets so the plan resolves the
+      # sensitive variables declared in variables.tf without echoing them.
+      TF_VAR_railway_token: ${{ secrets.TF_VAR_RAILWAY_TOKEN }}
+      TF_VAR_jwt_secret: ${{ secrets.TF_VAR_JWT_SECRET }}
+      TF_VAR_artifact_signing_secret: ${{ secrets.TF_VAR_ARTIFACT_SIGNING_SECRET }}
+      TF_VAR_callback_secret: ${{ secrets.TF_VAR_CALLBACK_SECRET }}
+      TF_VAR_n8n_webhook_url: ${{ secrets.TF_VAR_N8N_WEBHOOK_URL }}
+      TF_VAR_n8n_webhook_secret: ${{ secrets.TF_VAR_N8N_WEBHOOK_SECRET }}
+      TF_VAR_superadmin_email: ${{ secrets.TF_VAR_SUPERADMIN_EMAIL }}
+      TF_VAR_superadmin_password: ${{ secrets.TF_VAR_SUPERADMIN_PASSWORD }}
+      TF_VAR_resend_api_key: ${{ secrets.TF_VAR_RESEND_API_KEY }}
+      TF_VAR_public_api_base_url: ${{ secrets.TF_VAR_PUBLIC_API_BASE_URL }}
+      TF_VAR_frontend_base_url: ${{ secrets.TF_VAR_FRONTEND_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.0"
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Format check
+        run: terraform fmt -check -diff
+
+      - name: Init
+        run: terraform init -input=false
+
+      - name: Validate
+        run: terraform validate -no-color
+
+      - name: Plan
+        id: plan
+        run: terraform plan -no-color -input=false -out=plan.tfplan
+
+      - name: Post plan to the job summary
+        if: always() && steps.plan.outcome != 'skipped'
+        run: |
+          {
+            echo "### Terraform plan"
+            echo ""
+            echo '```'
+            terraform show -no-color plan.tfplan 2>/dev/null || echo "(plan unavailable)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
