@@ -47,4 +47,8 @@ jobs:
         run: terraform init -input=false
 
       - name: Apply
-        run: terraform apply -auto-approve -input=false
+        # -parallelism=1 serializes resource creation so each
+        # railway_variable upsert finishes its triggered redeploy before
+        # the next one starts. Without this, Railway rate-limits
+        # serviceInstanceRedeploy and the apply fails partway through.
+        run: terraform apply -auto-approve -input=false -parallelism=1
