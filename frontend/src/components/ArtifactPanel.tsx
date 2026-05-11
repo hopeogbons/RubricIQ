@@ -12,9 +12,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { extractErrorMessage } from "@/lib/api";
 import {
   addLinks,
+  addText,
   deleteArtifact,
   FILE_ACCEPT,
   uploadFiles,
@@ -30,26 +32,35 @@ interface ArtifactPanelProps {
 }
 
 const LINK_TYPES: { value: LinkArtifactType; label: string }[] = [
-  { value: "github_link", label: "GitHub link" },
-  { value: "video_link", label: "Video link" },
+  { value: "github", label: "GitHub" },
+  { value: "loom", label: "Loom" },
+  { value: "gdrive_video", label: "Google Drive video" },
 ];
 
 function describeArtifact(a: Artifact): string {
   if (a.filename) return a.filename;
   if (a.external_url) return a.external_url;
+  if (a.text_value) {
+    const truncated = a.text_value.length > 80
+      ? `${a.text_value.slice(0, 80)}...`
+      : a.text_value;
+    return truncated;
+  }
   return a.id;
 }
 
 function typeLabel(type: Artifact["type"]): string {
   switch (type) {
-    case "video_file":
-      return "Video file";
     case "screenshot":
       return "Screenshot";
-    case "video_link":
-      return "Video link";
-    case "github_link":
-      return "GitHub link";
+    case "loom":
+      return "Loom";
+    case "gdrive_video":
+      return "Google Drive video";
+    case "github":
+      return "GitHub";
+    case "text":
+      return "Text note";
   }
 }
 
@@ -59,10 +70,10 @@ export function ArtifactPanel({
 }: ArtifactPanelProps): JSX.Element {
   const queryClient = useQueryClient();
   const [opError, setOpError] = useState<string | null>(null);
-  const [linkType, setLinkType] = useState<LinkArtifactType>("github_link");
+  const [linkType, setLinkType] = useState<LinkArtifactType>("github");
   const [linkUrl, setLinkUrl] = useState("");
+  const [textValue, setTextValue] = useState("");
   const screenshotInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: submissionKey(submissionId) });
@@ -86,6 +97,16 @@ export function ArtifactPanel({
       await invalidate();
     },
     onError: (err) => setOpError(extractErrorMessage(err, "Failed to add link.")),
+  });
+
+  const textMutation = useMutation({
+    mutationFn: (value: string) => addText(submissionId, value),
+    onSuccess: async () => {
+      setOpError(null);
+      setTextValue("");
+      await invalidate();
+    },
+    onError: (err) => setOpError(extractErrorMessage(err, "Failed to add text.")),
   });
 
   const deleteMutation = useMutation({
@@ -125,13 +146,23 @@ export function ArtifactPanel({
     linkMutation.mutate({ type: linkType, url: trimmed });
   };
 
+  const submitText = (): void => {
+    const trimmed = textValue.trim();
+    if (!trimmed) {
+      setOpError("Enter some text.");
+      return;
+    }
+    setOpError(null);
+    textMutation.mutate(trimmed);
+  };
+
   return (
     <Card data-testid="artifact-panel">
       <CardHeader>
         <CardTitle>Artifacts</CardTitle>
         <CardDescription>
-          Add videos, screenshots, or links before evaluating. You can change them
-          while the submission is in draft.
+          Add screenshots, links (Loom, Google Drive video, GitHub), or a text note
+          before evaluating. You can change them while the submission is in draft.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -179,41 +210,22 @@ export function ArtifactPanel({
           )}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="upload-screenshot">Screenshots</Label>
-            <input
-              ref={screenshotInputRef}
-              id="upload-screenshot"
-              data-testid="upload-screenshot"
-              type="file"
-              multiple
-              accept={FILE_ACCEPT.screenshot}
-              className="block w-full text-sm"
-              onChange={(e) =>
-                handleFiles("screenshot", screenshotInputRef, e.target.files)
-              }
-              disabled={uploadMutation.isPending}
-            />
-            <p className="text-xs text-muted-foreground">PNG, JPG, JPEG</p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="upload-video">Videos</Label>
-            <input
-              ref={videoInputRef}
-              id="upload-video"
-              data-testid="upload-video"
-              type="file"
-              multiple
-              accept={FILE_ACCEPT.video_file}
-              className="block w-full text-sm"
-              onChange={(e) =>
-                handleFiles("video_file", videoInputRef, e.target.files)
-              }
-              disabled={uploadMutation.isPending}
-            />
-            <p className="text-xs text-muted-foreground">MP4, MOV, WEBM</p>
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="upload-screenshot">Screenshots</Label>
+          <input
+            ref={screenshotInputRef}
+            id="upload-screenshot"
+            data-testid="upload-screenshot"
+            type="file"
+            multiple
+            accept={FILE_ACCEPT.screenshot}
+            className="block w-full text-sm"
+            onChange={(e) =>
+              handleFiles("screenshot", screenshotInputRef, e.target.files)
+            }
+            disabled={uploadMutation.isPending}
+          />
+          <p className="text-xs text-muted-foreground">PNG, JPG, JPEG. Multiple files allowed.</p>
         </div>
 
         <div className="space-y-2">
@@ -246,6 +258,29 @@ export function ArtifactPanel({
               data-testid="add-link-button"
             >
               Add link
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="text-note">Add a text note</Label>
+          <Textarea
+            id="text-note"
+            data-testid="text-note"
+            rows={3}
+            placeholder="Free-form notes the evaluator should see..."
+            value={textValue}
+            onChange={(e) => setTextValue(e.target.value)}
+          />
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={submitText}
+              disabled={textMutation.isPending}
+              data-testid="add-text-button"
+            >
+              Add text
             </Button>
           </div>
         </div>

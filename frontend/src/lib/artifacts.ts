@@ -2,9 +2,9 @@ import axios, { AxiosHeaders, type AxiosResponse } from "axios";
 
 import { api, getStoredToken } from "@/lib/api";
 
-export type ArtifactType = "video_file" | "screenshot" | "video_link" | "github_link";
-export type FileArtifactType = "video_file" | "screenshot";
-export type LinkArtifactType = "video_link" | "github_link";
+export type ArtifactType = "loom" | "gdrive_video" | "github" | "screenshot" | "text";
+export type FileArtifactType = "screenshot";
+export type LinkArtifactType = "loom" | "gdrive_video" | "github";
 
 export interface Artifact {
   id: string;
@@ -12,12 +12,12 @@ export interface Artifact {
   type: ArtifactType;
   filename: string | null;
   external_url: string | null;
+  text_value: string | null;
   size_bytes: number | null;
   created_at: string;
 }
 
 export const FILE_ACCEPT: Record<FileArtifactType, string> = {
-  video_file: ".mp4,.mov,.webm",
   screenshot: ".png,.jpg,.jpeg",
 };
 
@@ -79,6 +79,17 @@ export async function addLinks(
   const resp = await api.post<Artifact[]>(
     `/submissions/${submissionId}/artifacts/links`,
     { links },
+  );
+  return resp.data;
+}
+
+export async function addText(
+  submissionId: string,
+  value: string,
+): Promise<Artifact> {
+  const resp = await api.post<Artifact>(
+    `/submissions/${submissionId}/artifacts/text`,
+    { value },
   );
   return resp.data;
 }
