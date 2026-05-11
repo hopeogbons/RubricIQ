@@ -96,6 +96,7 @@ function setupWizardScenario(): WizardScenario {
           type: next.type,
           filename: next.filename,
           external_url: null,
+          text_value: null,
           size_bytes: 0,
           created_at: "2026-05-10T00:00:00Z",
         };
@@ -115,6 +116,7 @@ function setupWizardScenario(): WizardScenario {
           type: l.type,
           filename: null,
           external_url: l.url,
+          text_value: null,
           size_bytes: null,
           created_at: "2026-05-10T00:00:00Z",
         }));
