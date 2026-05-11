@@ -18,7 +18,6 @@ from app.schemas.evaluation import EvaluationOut
 from app.schemas.submission import SubmissionDetailOut, SubmissionStatusOut
 from app.services.access import rubric_scope_clause
 from app.services.artifact_token import issue_artifact_token
-from app.services.callback_token import issue_callback_token
 from app.services.n8n_service import N8nClient, N8nTriggerError, get_n8n_client
 
 logger = logging.getLogger(__name__)
@@ -69,6 +68,9 @@ def create_submission(
     user: User = Depends(require_admin_or_evaluator),
     db: Session = Depends(get_db),
 ) -> SubmissionDetailOut:
+    """Create the learner's submission. A learner has at most one submission; if
+    one already exists, return it instead of erroring so the caller can resume
+    the existing draft or re-evaluate."""
     learner = db.get(Learner, learner_id)
     if learner is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Learner not found")
@@ -80,6 +82,12 @@ def create_submission(
         rubric_q = rubric_q.where(clause)
     if db.scalar(rubric_q) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Learner not found")
+
+    existing = db.scalar(
+        select(Submission).where(Submission.learner_id == learner.id)
+    )
+    if existing is not None:
+        return _build_detail(existing)
 
     submission = Submission(
         learner_id=learner.id,
@@ -113,34 +121,26 @@ def get_submission_status(
     return SubmissionStatusOut.from_submission(submission)
 
 
-def _build_trigger_payload(submission: Submission) -> dict:
+def _build_trigger_payload(submission: Submission, rubric: Rubric | None) -> dict:
+    """Match the n8n trigger contract: a flat top-level body with the artifact
+    set the workflow understands. URL artifacts share the same `url` key; text
+    artifacts carry their content in `value` instead."""
     base = settings.public_api_base_url.rstrip("/")
     artifacts: list[dict] = []
     for a in submission.artifacts:
-        if a.type in {"video_file", "screenshot"}:
+        if a.type == "screenshot":
             token = issue_artifact_token(submission.id, a.filename or "")
-            artifacts.append(
-                {
-                    "type": a.type,
-                    "url": f"{base}/artifacts/{token}",
-                    "filename": a.filename,
-                }
-            )
+            artifacts.append({"type": "screenshot", "url": f"{base}/artifacts/{token}"})
+        elif a.type == "text":
+            artifacts.append({"type": "text", "value": a.text_value or ""})
         else:
             artifacts.append({"type": a.type, "url": a.external_url})
 
     return {
-        "submission_id": str(submission.id),
-        "rubric_unique_name": submission.learner.rubric_id and None,  # filled below
-        "learner": {
-            "id": str(submission.learner.id),
-            "name": submission.learner.full_name,
-            "email": submission.learner.email,
-            "cohort": submission.learner.cohort,
-        },
+        "learner_id": str(submission.learner.id),
+        "assessment_id": rubric.unique_name if rubric else None,
+        "cohort": submission.learner.cohort,
         "artifacts": artifacts,
-        "callback_url": f"{base}/webhooks/n8n-callback",
-        "callback_token": issue_callback_token(submission.id),
     }
 
 
@@ -151,12 +151,16 @@ def evaluate_submission(
     db: Session = Depends(get_db),
     n8n: N8nClient = Depends(get_n8n_client),
 ) -> SubmissionDetailOut:
+    """Trigger an evaluation. Allowed when the submission is in `draft`,
+    `complete`, or `failed`; calling on `complete` or `failed` clears the
+    prior evaluation row so the new result replaces it. `processing` rejects
+    with 409 to avoid two concurrent n8n workflows for one learner."""
     submission = _submission_in_scope(submission_id, user, db)
 
-    if submission.status != "draft":
+    if submission.status == "processing":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Submission is in {submission.status} state and cannot be re-evaluated",
+            detail="Submission is already processing",
         )
 
     artifact_count = db.scalar(
@@ -171,8 +175,7 @@ def evaluate_submission(
         )
 
     rubric = db.get(Rubric, submission.rubric_id)
-    payload = _build_trigger_payload(submission)
-    payload["rubric_unique_name"] = rubric.unique_name if rubric else None
+    payload = _build_trigger_payload(submission, rubric)
 
     try:
         n8n.trigger(payload)
@@ -180,11 +183,18 @@ def evaluate_submission(
         logger.warning("n8n trigger failed for submission_id=%s: %s", submission.id, exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to reach n8n; submission left in draft",
+            detail="Failed to reach n8n; submission left in its prior state",
         ) from exc
 
+    # Re-evaluation: wipe the prior evaluation row (cascades will remove
+    # EvaluationScore rows) so the upcoming callback writes a fresh one.
+    if submission.evaluation is not None:
+        db.delete(submission.evaluation)
+        db.flush()
     submission.status = "processing"
     submission.triggered_at = datetime.now(tz=UTC)
+    submission.completed_at = None
+    submission.error_message = None
     db.commit()
     db.refresh(submission)
     return _build_detail(submission)

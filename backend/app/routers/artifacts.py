@@ -13,7 +13,7 @@ from app.config import settings
 from app.deps import get_db, require_admin_or_evaluator
 from app.models import Submission, SubmissionArtifact, User
 from app.routers.submissions import _submission_in_scope
-from app.schemas.artifact import ArtifactLinksCreate, ArtifactOut
+from app.schemas.artifact import ArtifactLinksCreate, ArtifactOut, ArtifactTextCreate
 from app.services.artifact_storage import (
     FileTooLargeError,
     LocalArtifactStorage,
@@ -28,8 +28,9 @@ nested_router = APIRouter(
 )
 flat_router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 
+# File uploads are limited to screenshots; videos must come in as Loom or
+# Google Drive links since that is what n8n consumes.
 ALLOWED_EXTENSIONS: dict[str, set[str]] = {
-    "video_file": {".mp4", ".mov", ".webm"},
     "screenshot": {".png", ".jpg", ".jpeg"},
 }
 
@@ -45,11 +46,14 @@ def _safe_filename(filename: str) -> str:
     return base
 
 
-def _ensure_draft(submission: Submission) -> None:
-    if submission.status != "draft":
+def _ensure_not_processing(submission: Submission) -> None:
+    """Artifacts can be edited any time except while n8n is mid-run. Mutating
+    artifacts on complete or failed is allowed so the evaluator can fix things
+    up and re-evaluate."""
+    if submission.status == "processing":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Cannot modify artifacts on a {submission.status} submission",
+            detail="Cannot modify artifacts while the submission is processing",
         )
 
 
@@ -57,7 +61,7 @@ def _get_writable_submission(
     submission_id: UUID, user: User, db: Session
 ) -> Submission:
     submission = _submission_in_scope(submission_id, user, db)
-    _ensure_draft(submission)
+    _ensure_not_processing(submission)
     return submission
 
 
@@ -174,6 +178,27 @@ def add_links(
     return created
 
 
+@nested_router.post(
+    "/text", response_model=ArtifactOut, status_code=status.HTTP_201_CREATED
+)
+def add_text(
+    submission_id: UUID,
+    body: ArtifactTextCreate,
+    user: User = Depends(require_admin_or_evaluator),
+    db: Session = Depends(get_db),
+) -> SubmissionArtifact:
+    submission = _get_writable_submission(submission_id, user, db)
+    artifact = SubmissionArtifact(
+        submission_id=submission.id,
+        type="text",
+        text_value=body.value,
+    )
+    db.add(artifact)
+    db.commit()
+    db.refresh(artifact)
+    return artifact
+
+
 @nested_router.delete(
     "/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT
 )
@@ -190,7 +215,7 @@ def delete_artifact(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
 
     filename = artifact.filename
-    is_file = artifact.type in ALLOWED_EXTENSIONS  # video_file or screenshot
+    is_file = artifact.type in ALLOWED_EXTENSIONS  # currently just screenshot
     db.delete(artifact)
     db.commit()
     if is_file and filename:
@@ -220,7 +245,7 @@ def download_artifact(
         select(SubmissionArtifact).where(
             SubmissionArtifact.submission_id == submission_id,
             SubmissionArtifact.filename == filename,
-            SubmissionArtifact.type.in_(["video_file", "screenshot"]),
+            SubmissionArtifact.type == "screenshot",
         )
     )
     if artifact is None:

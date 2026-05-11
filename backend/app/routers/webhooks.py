@@ -1,10 +1,12 @@
+import hmac
 import logging
 from datetime import UTC, datetime
 
-import jwt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.deps import get_db
 from app.models import Evaluation, EvaluationScore, Submission
 from app.routers.submissions import _build_detail
@@ -14,42 +16,48 @@ from app.services.artifact_storage import (
     LocalArtifactStorage,
     get_artifact_storage,
 )
-from app.services.callback_token import decode_callback_token
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
+CALLBACK_API_KEY_HEADER = "X-API-Key"
 
-@router.post("/n8n-callback", response_model=SubmissionDetailOut)
+
+def _verify_callback_api_key(
+    x_api_key: str | None = Header(default=None, alias=CALLBACK_API_KEY_HEADER),
+) -> None:
+    """n8n authenticates each callback with a fixed shared secret in
+    X-API-Key. Use a constant-time compare to avoid leaking the secret via
+    timing differences."""
+    expected = settings.callback_secret
+    if not x_api_key or not hmac.compare_digest(x_api_key, expected):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing callback API key",
+        )
+
+
+@router.post(
+    "/n8n-callback",
+    response_model=SubmissionDetailOut,
+    dependencies=[Depends(_verify_callback_api_key)],
+)
 def n8n_callback(
     body: WebhookCallbackBody,
     db: Session = Depends(get_db),
     storage: LocalArtifactStorage = Depends(get_artifact_storage),
 ) -> SubmissionDetailOut:
-    """Receive evaluation results from n8n. The token in the body is the auth;
-    no FastAPI user session is required (or possible)."""
-    try:
-        token_submission_id = decode_callback_token(body.callback_token)
-    except jwt.PyJWTError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired callback token"
-        ) from exc
-    except (ValueError, KeyError, TypeError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid callback token payload"
-        ) from exc
-
-    if token_submission_id != body.submission_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token does not match submission",
-        )
-
-    submission = db.get(Submission, body.submission_id)
+    """Receive evaluation results from n8n. Auth is the X-API-Key header
+    handled in the dependency above; correlation is by learner_id (each
+    learner has at most one submission)."""
+    submission = db.scalar(
+        select(Submission).where(Submission.learner_id == body.learner_id)
+    )
     if submission is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No submission found for that learner",
         )
 
     # Idempotent: if the submission is already terminal, return its current state.
@@ -93,7 +101,9 @@ def n8n_callback(
         # status == "failed"
         submission.status = "failed"
         submission.completed_at = now
-        submission.error_message = body.error or "n8n reported failure with no details"
+        submission.error_message = (
+            body.error_message or "n8n reported failure with no details"
+        )
 
     db.commit()
     db.refresh(submission)
