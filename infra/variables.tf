@@ -64,12 +64,7 @@ variable "resend_api_key" {
   sensitive   = true
 }
 
-variable "public_api_base_url" {
-  description = "Public base URL of the backend (e.g. https://api.rubriciq.com)."
-  type        = string
-}
-
-variable "frontend_base_url" {
-  description = "Public base URL of the frontend (e.g. https://app.rubriciq.com), used in activation emails."
-  type        = string
-}
+# Public URLs are no longer declared as variables: each service's URL is
+# Railway's auto-issued *.up.railway.app domain, wired through reference
+# variables in main.tf. If you later attach a custom domain, replace the
+# reference expressions with fixed URLs (or reintroduce these variables).

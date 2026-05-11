@@ -27,6 +27,7 @@ superadmin_password = "REPLACE_WITH_STRONG_PASSWORD"
 # Resend API key for activation emails. https://resend.com/api-keys
 resend_api_key = "re_REPLACE_ME"
 
-# Public URLs. These must match the custom domains attached to the services.
-public_api_base_url = "https://api.rubriciq.com"
-frontend_base_url   = "https://app.rubriciq.com"
+# No public-URL variables are needed: each service learns the other's
+# *.up.railway.app domain at deploy time via Railway reference variables
+# wired in main.tf. Add a custom domain later by reintroducing a
+# railway_custom_domain resource and switching the env wiring to it.

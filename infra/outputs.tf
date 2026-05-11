@@ -13,12 +13,6 @@ output "frontend_service_id" {
   value       = railway_service.frontend.id
 }
 
-output "api_url" {
-  description = "Public API URL (custom domain attached to the backend service)."
-  value       = "https://${railway_custom_domain.api.domain}"
-}
-
-output "app_url" {
-  description = "Public app URL (custom domain attached to the frontend service)."
-  value       = "https://${railway_custom_domain.app.domain}"
-}
+# The public URLs are only known after Railway issues each service its
+# *.up.railway.app domain. Find them on the service pages in the Railway
+# dashboard after the first deploy completes.

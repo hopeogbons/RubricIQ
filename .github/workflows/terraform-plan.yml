@@ -32,8 +32,6 @@ jobs:
       TF_VAR_superadmin_email: ${{ secrets.TF_VAR_SUPERADMIN_EMAIL }}
       TF_VAR_superadmin_password: ${{ secrets.TF_VAR_SUPERADMIN_PASSWORD }}
       TF_VAR_resend_api_key: ${{ secrets.TF_VAR_RESEND_API_KEY }}
-      TF_VAR_public_api_base_url: ${{ secrets.TF_VAR_PUBLIC_API_BASE_URL }}
-      TF_VAR_frontend_base_url: ${{ secrets.TF_VAR_FRONTEND_BASE_URL }}
     steps:
       - uses: actions/checkout@v4
 

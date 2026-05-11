@@ -50,6 +50,14 @@ resource "railway_service" "frontend" {
 locals {
   default_env_id = railway_project.rubriciq.default_environment.id
 
+  # URLs use Railway's reference-variable syntax so each service learns the
+  # other's public *.up.railway.app domain at deploy time without a custom
+  # domain. If you later add a custom domain, swap these for fixed strings
+  # and add a railway_custom_domain resource per service.
+  backend_self_url       = "https://$${{RAILWAY_PUBLIC_DOMAIN}}"
+  frontend_url_from_back = "https://$${{frontend.RAILWAY_PUBLIC_DOMAIN}}"
+  backend_url_from_front = "https://$${{backend.RAILWAY_PUBLIC_DOMAIN}}"
+
   # DATABASE_URL is a Railway reference variable that resolves to the Postgres
   # plugin's connection string at deploy time; the plugin itself is created
   # manually since the provider does not expose it.
@@ -63,9 +71,9 @@ locals {
     SUPERADMIN_EMAIL        = var.superadmin_email
     SUPERADMIN_PASSWORD     = var.superadmin_password
     RESEND_API_KEY          = var.resend_api_key
-    PUBLIC_API_BASE_URL     = var.public_api_base_url
-    FRONTEND_BASE_URL       = var.frontend_base_url
-    CORS_ALLOW_ORIGINS      = var.frontend_base_url
+    PUBLIC_API_BASE_URL     = local.backend_self_url
+    FRONTEND_BASE_URL       = local.frontend_url_from_back
+    CORS_ALLOW_ORIGINS      = local.frontend_url_from_back
     ARTIFACT_DIR            = "/data/artifacts"
     ENV                     = "production"
   }
@@ -82,19 +90,7 @@ resource "railway_variable" "backend_env" {
 
 resource "railway_variable" "frontend_api_base" {
   name           = "VITE_API_BASE_URL"
-  value          = var.public_api_base_url
-  environment_id = local.default_env_id
-  service_id     = railway_service.frontend.id
-}
-
-resource "railway_custom_domain" "api" {
-  domain         = "api.rubriciq.com"
-  environment_id = local.default_env_id
-  service_id     = railway_service.backend.id
-}
-
-resource "railway_custom_domain" "app" {
-  domain         = "app.rubriciq.com"
+  value          = local.backend_url_from_front
   environment_id = local.default_env_id
   service_id     = railway_service.frontend.id
 }
