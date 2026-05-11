@@ -4,6 +4,15 @@ variable "railway_token" {
   sensitive   = true
 }
 
+variable "railway_workspace_id" {
+  description = <<EOT
+Railway workspace ID to create the project in. Required when the token can
+see more than one workspace. Find it at
+https://railway.com/account/workspaces (or the workspace's Settings page).
+EOT
+  type        = string
+}
+
 variable "github_repo" {
   description = "GitHub repository to deploy from, in 'owner/name' form."
   type        = string

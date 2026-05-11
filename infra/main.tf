@@ -17,8 +17,9 @@ provider "railway" {
 }
 
 resource "railway_project" "rubriciq" {
-  name        = "rubriciq"
-  description = "Rubric-based learner evaluation"
+  name         = "rubriciq"
+  description  = "Rubric-based learner evaluation"
+  workspace_id = var.railway_workspace_id
 }
 
 # The community provider v0.6 does not expose a "plugin" resource, so the

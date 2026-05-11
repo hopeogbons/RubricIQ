@@ -5,6 +5,9 @@
 # Railway account token. Generate at https://railway.app/account/tokens.
 railway_token = "rwy_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
+# Railway workspace ID (UUID). Find at https://railway.com/account/workspaces.
+railway_workspace_id = "00000000-0000-0000-0000-000000000000"
+
 # GitHub source for the Railway services. Defaults to hopeogbons/RubricIQ@main,
 # override only if you forked the repo.
 # github_repo   = "your-org/your-fork"

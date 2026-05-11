@@ -24,6 +24,7 @@ jobs:
       # TF_VAR_* are surfaced from repo secrets so the plan resolves the
       # sensitive variables declared in variables.tf without echoing them.
       TF_VAR_railway_token: ${{ secrets.TF_VAR_RAILWAY_TOKEN }}
+      TF_VAR_railway_workspace_id: ${{ secrets.TF_VAR_RAILWAY_WORKSPACE_ID }}
       TF_VAR_jwt_secret: ${{ secrets.TF_VAR_JWT_SECRET }}
       TF_VAR_artifact_signing_secret: ${{ secrets.TF_VAR_ARTIFACT_SIGNING_SECRET }}
       TF_VAR_callback_secret: ${{ secrets.TF_VAR_CALLBACK_SECRET }}
