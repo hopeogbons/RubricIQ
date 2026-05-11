@@ -1,0 +1,32 @@
+# Copy to terraform.tfvars (gitignored) and fill in real values before running
+# `terraform plan` or `terraform apply`. Anything marked sensitive should come
+# from a password manager or secret store, never paste into chat.
+
+# Railway account token. Generate at https://railway.app/account/tokens.
+railway_token = "rwy_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# GitHub source for the Railway services. Defaults to hopeogbons/RubricIQ@main,
+# override only if you forked the repo.
+# github_repo   = "your-org/your-fork"
+# github_branch = "main"
+
+# 64-char random strings. Generate with: openssl rand -hex 32
+jwt_secret              = "REPLACE_WITH_64_RANDOM_HEX_CHARS"
+artifact_signing_secret = "REPLACE_WITH_64_RANDOM_HEX_CHARS"
+callback_secret         = "REPLACE_WITH_64_RANDOM_HEX_CHARS"
+
+# n8n Cloud workflow trigger URL and the shared X-API-Key secret.
+n8n_webhook_url    = "https://your-n8n-instance.app.n8n.cloud/webhook/rubriciq"
+n8n_webhook_secret = "REPLACE_WITH_SHARED_SECRET"
+
+# Initial superadmin (seeded once on first backend boot; env vars are ignored
+# after that). Change the password immediately after first login.
+superadmin_email    = "you@example.com"
+superadmin_password = "REPLACE_WITH_STRONG_PASSWORD"
+
+# Resend API key for activation emails. https://resend.com/api-keys
+resend_api_key = "re_REPLACE_ME"
+
+# Public URLs. These must match the custom domains attached to the services.
+public_api_base_url = "https://api.rubriciq.com"
+frontend_base_url   = "https://app.rubriciq.com"

@@ -30,12 +30,13 @@ dist/
 .env.local
 .env.*.local
 
-# Terraform
+# Terraform (commit .terraform.lock.hcl for reproducible plans)
 .terraform/
-.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 terraform.tfvars
+crash.log
+crash.*.log
 
 # Editor
 .vscode/
