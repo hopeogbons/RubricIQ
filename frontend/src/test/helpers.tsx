@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 
 import { TOKEN_STORAGE_KEY } from "@/lib/api";
 import { AuthProvider, type User } from "@/lib/auth";
+import { ToastProvider, Toaster } from "@/lib/toast";
 import { server } from "@/test/msw-server";
 
 interface ProvidersProps {
@@ -19,7 +20,12 @@ export function Providers({ children, initialEntries = ["/"] }: ProvidersProps):
   return (
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={initialEntries}>
-        <AuthProvider>{children}</AuthProvider>
+        <ToastProvider durationMs={60_000}>
+          <AuthProvider>
+            {children}
+            <Toaster />
+          </AuthProvider>
+        </ToastProvider>
       </MemoryRouter>
     </QueryClientProvider>
   );
