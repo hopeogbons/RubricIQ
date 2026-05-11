@@ -29,7 +29,7 @@ class Submission(Base):
             name="submissions_status_check",
         ),
         Index("ix_submissions_rubric_id_status", "rubric_id", "status"),
-        Index("ix_submissions_learner_id", "learner_id"),
+        Index("ix_submissions_learner_id", "learner_id", unique=True),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

@@ -8,6 +8,7 @@ from sqlalchemy import (
     CheckConstraint,
     ForeignKey,
     String,
+    Text,
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -23,7 +24,7 @@ class SubmissionArtifact(Base):
     __tablename__ = "submission_artifacts"
     __table_args__ = (
         CheckConstraint(
-            "type in ('video_file','screenshot','video_link','github_link')",
+            "type in ('loom','gdrive_video','github','screenshot','text')",
             name="submission_artifacts_type_check",
         ),
     )
@@ -41,6 +42,7 @@ class SubmissionArtifact(Base):
     external_url: Mapped[str | None] = mapped_column(String, nullable=True)
     filename: Mapped[str | None] = mapped_column(String, nullable=True)
     size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    text_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
     )

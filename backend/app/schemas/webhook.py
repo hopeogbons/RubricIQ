@@ -20,10 +20,11 @@ class WebhookCallbackEvaluation(BaseModel):
 
 
 class WebhookCallbackBody(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    """n8n -> RubricIQ callback. n8n authenticates with a fixed X-API-Key header
+    that we verify against settings.callback_secret; correlation is by
+    learner_id since each learner has at most one submission."""
 
-    submission_id: UUID
-    callback_token: str
+    learner_id: UUID
     status: Literal["complete", "failed"]
     evaluation: WebhookCallbackEvaluation | None = None
-    error: str | None = None
+    error_message: str | None = None
