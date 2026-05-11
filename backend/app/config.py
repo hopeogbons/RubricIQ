@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -6,6 +7,21 @@ class Settings(BaseSettings):
 
     database_url: str
     env: str = "development"
+
+    # CORS allow-list. Defaults to the Vite/CRA dev ports; production should
+    # set CORS_ALLOW_ORIGINS to the public app origin (comma-separated for
+    # multiple). Wildcards are not supported; SPEC requires explicit origins.
+    cors_allow_origins: list[str] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ]
+
+    @field_validator("cors_allow_origins", mode="before")
+    @classmethod
+    def _split_cors(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [s.strip() for s in value.split(",") if s.strip()]
+        return value
 
     jwt_secret: str
     jwt_algorithm: str = "HS256"

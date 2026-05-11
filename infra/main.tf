@@ -65,6 +65,7 @@ locals {
     RESEND_API_KEY          = var.resend_api_key
     PUBLIC_API_BASE_URL     = var.public_api_base_url
     FRONTEND_BASE_URL       = var.frontend_base_url
+    CORS_ALLOW_ORIGINS      = var.frontend_base_url
     ARTIFACT_DIR            = "/data/artifacts"
     ENV                     = "production"
   }
