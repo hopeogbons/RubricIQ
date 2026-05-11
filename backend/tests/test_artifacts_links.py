@@ -23,7 +23,9 @@ def draft_submission(db_session, make_submission):
     return _make
 
 
-def test_admin_adds_video_and_github_links(client, auth_headers, draft_submission):
+def test_admin_adds_loom_gdrive_and_github_links(
+    client, auth_headers, draft_submission
+):
     headers, admin = auth_headers(role="admin")
     _, _, sub = draft_submission(created_by=admin.id)
     r = client.post(
@@ -31,14 +33,15 @@ def test_admin_adds_video_and_github_links(client, auth_headers, draft_submissio
         headers=headers,
         json={
             "links": [
-                {"type": "video_link", "url": "https://loom.com/share/abc"},
-                {"type": "github_link", "url": "https://github.com/jane/proj"},
+                {"type": "loom", "url": "https://loom.com/share/abc"},
+                {"type": "gdrive_video", "url": "https://drive.google.com/file/d/x"},
+                {"type": "github", "url": "https://github.com/jane/proj"},
             ]
         },
     )
     assert r.status_code == 201, r.text
     body = r.json()
-    assert {a["type"] for a in body} == {"video_link", "github_link"}
+    assert {a["type"] for a in body} == {"loom", "gdrive_video", "github"}
     assert all(a["external_url"] for a in body)
     assert all(a["filename"] is None for a in body)
 
@@ -49,7 +52,7 @@ def test_invalid_url_rejected(client, auth_headers, draft_submission):
     r = client.post(
         f"/submissions/{sub.id}/artifacts/links",
         headers=headers,
-        json={"links": [{"type": "github_link", "url": "not-a-url"}]},
+        json={"links": [{"type": "github", "url": "not-a-url"}]},
     )
     assert r.status_code == 422
 
@@ -62,7 +65,7 @@ def test_file_type_rejected_in_links_endpoint(
     r = client.post(
         f"/submissions/{sub.id}/artifacts/links",
         headers=headers,
-        json={"links": [{"type": "video_file", "url": "https://x.com/y"}]},
+        json={"links": [{"type": "screenshot", "url": "https://x.com/y"}]},
     )
     assert r.status_code == 422
 
@@ -77,7 +80,7 @@ def test_links_post_to_non_draft_returns_409(
     r = client.post(
         f"/submissions/{sub.id}/artifacts/links",
         headers=headers,
-        json={"links": [{"type": "video_link", "url": "https://loom.com/x"}]},
+        json={"links": [{"type": "loom", "url": "https://loom.com/x"}]},
     )
     assert r.status_code == 409
 
@@ -88,6 +91,6 @@ def test_viewer_cannot_post_links(client, auth_headers, draft_submission):
     r = client.post(
         f"/submissions/{sub.id}/artifacts/links",
         headers=headers,
-        json={"links": [{"type": "video_link", "url": "https://loom.com/x"}]},
+        json={"links": [{"type": "loom", "url": "https://loom.com/x"}]},
     )
     assert r.status_code == 403

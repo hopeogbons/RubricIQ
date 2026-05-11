@@ -1,17 +1,19 @@
 import io
 import os
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import select
 
+from app.config import settings
 from app.models import Evaluation, EvaluationScore, Learner, Rubric
-from app.services.callback_token import (
-    issue_callback_token,
-)
 
 CALLBACK_PATH = "/webhooks/n8n-callback"
+
+
+def _auth_headers() -> dict[str, str]:
+    return {"X-API-Key": settings.callback_secret}
 
 
 @pytest.fixture()
@@ -53,8 +55,7 @@ def test_complete_callback_writes_evaluation_and_scores(
     assert os.path.isdir(artifact_dir)
 
     body = {
-        "submission_id": str(sub.id),
-        "callback_token": issue_callback_token(sub.id),
+        "learner_id": str(sub.learner_id),
         "status": "complete",
         "evaluation": {
             "total_score": 18,
@@ -75,7 +76,7 @@ def test_complete_callback_writes_evaluation_and_scores(
             ],
         },
     }
-    r = client.post(CALLBACK_PATH, json=body)
+    r = client.post(CALLBACK_PATH, json=body, headers=_auth_headers())
     assert r.status_code == 200, r.text
     out = r.json()
     assert out["status"] == "complete"
@@ -99,12 +100,11 @@ def test_failed_callback_sets_error_and_no_evaluation(
 ):
     sub = processing_submission()
     body = {
-        "submission_id": str(sub.id),
-        "callback_token": issue_callback_token(sub.id),
+        "learner_id": str(sub.learner_id),
         "status": "failed",
-        "error": "n8n workflow blew up",
+        "error_message": "n8n workflow blew up",
     }
-    r = client.post(CALLBACK_PATH, json=body)
+    r = client.post(CALLBACK_PATH, json=body, headers=_auth_headers())
     assert r.status_code == 200
     out = r.json()
     assert out["status"] == "failed"
@@ -124,72 +124,48 @@ def test_complete_without_evaluation_payload_returns_400(
     sub = processing_submission()
     r = client.post(
         CALLBACK_PATH,
-        json={
-            "submission_id": str(sub.id),
-            "callback_token": issue_callback_token(sub.id),
-            "status": "complete",
-        },
+        json={"learner_id": str(sub.learner_id), "status": "complete"},
+        headers=_auth_headers(),
     )
     assert r.status_code == 400
 
 
-def test_tampered_token_returns_401(client, processing_submission):
+def test_missing_api_key_returns_401(client, processing_submission):
     sub = processing_submission()
-    token = issue_callback_token(sub.id)
-    head, payload, _sig = token.split(".")
     r = client.post(
         CALLBACK_PATH,
         json={
-            "submission_id": str(sub.id),
-            "callback_token": f"{head}.{payload}.AAAA",
+            "learner_id": str(sub.learner_id),
             "status": "failed",
-            "error": "x",
+            "error_message": "x",
         },
     )
     assert r.status_code == 401
 
 
-def test_expired_token_returns_401(client, processing_submission):
+def test_wrong_api_key_returns_401(client, processing_submission):
     sub = processing_submission()
-    past = datetime.now(tz=UTC) - timedelta(hours=3)
-    token = issue_callback_token(sub.id, ttl_seconds=60, now=past)
     r = client.post(
         CALLBACK_PATH,
         json={
-            "submission_id": str(sub.id),
-            "callback_token": token,
+            "learner_id": str(sub.learner_id),
             "status": "failed",
-            "error": "x",
+            "error_message": "x",
         },
+        headers={"X-API-Key": "not-the-right-secret"},
     )
     assert r.status_code == 401
 
 
-def test_token_for_different_submission_returns_401(client, processing_submission):
-    sub = processing_submission()
-    token = issue_callback_token(uuid.uuid4())  # token for a different submission
+def test_callback_for_unknown_learner_returns_404(client):
     r = client.post(
         CALLBACK_PATH,
         json={
-            "submission_id": str(sub.id),
-            "callback_token": token,
+            "learner_id": str(uuid.uuid4()),
             "status": "failed",
-            "error": "x",
+            "error_message": "x",
         },
-    )
-    assert r.status_code == 401
-
-
-def test_callback_for_unknown_submission_returns_404(client):
-    sub_id = uuid.uuid4()
-    r = client.post(
-        CALLBACK_PATH,
-        json={
-            "submission_id": str(sub_id),
-            "callback_token": issue_callback_token(sub_id),
-            "status": "failed",
-            "error": "x",
-        },
+        headers=_auth_headers(),
     )
     assert r.status_code == 404
 
@@ -199,8 +175,7 @@ def test_callback_idempotent_on_already_complete_submission(
 ):
     sub = processing_submission()
     body = {
-        "submission_id": str(sub.id),
-        "callback_token": issue_callback_token(sub.id),
+        "learner_id": str(sub.learner_id),
         "status": "complete",
         "evaluation": {
             "total_score": 18,
@@ -208,7 +183,9 @@ def test_callback_idempotent_on_already_complete_submission(
             "scores": [{"criterion": "x", "score": 1, "max": 1}],
         },
     }
-    assert client.post(CALLBACK_PATH, json=body).status_code == 200
+    assert (
+        client.post(CALLBACK_PATH, json=body, headers=_auth_headers()).status_code == 200
+    )
 
     # Second delivery with totally different scores must be a no-op
     second = dict(body)
@@ -217,7 +194,7 @@ def test_callback_idempotent_on_already_complete_submission(
         "max_total": 25,
         "scores": [{"criterion": "y", "score": 0, "max": 5}],
     }
-    r = client.post(CALLBACK_PATH, json=second)
+    r = client.post(CALLBACK_PATH, json=second, headers=_auth_headers())
     assert r.status_code == 200
     out = r.json()
     assert out["evaluation"]["total_score"] == 18.0
@@ -236,8 +213,7 @@ def test_callback_idempotent_on_already_failed_submission(
     sub.error_message = "first failure"
     db_session.flush()
     body = {
-        "submission_id": str(sub.id),
-        "callback_token": issue_callback_token(sub.id),
+        "learner_id": str(sub.learner_id),
         "status": "complete",
         "evaluation": {
             "total_score": 99,
@@ -245,7 +221,7 @@ def test_callback_idempotent_on_already_failed_submission(
             "scores": [],
         },
     }
-    r = client.post(CALLBACK_PATH, json=body)
+    r = client.post(CALLBACK_PATH, json=body, headers=_auth_headers())
     assert r.status_code == 200
     out = r.json()
     assert out["status"] == "failed"

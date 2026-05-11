@@ -56,7 +56,7 @@ def test_delete_link_artifact(client, auth_headers, draft_submission, db_session
     headers, admin = auth_headers(role="admin")
     _, _, sub = draft_submission(created_by=admin.id)
     link = SubmissionArtifact(
-        submission_id=sub.id, type="github_link", external_url="https://github.com/x/y"
+        submission_id=sub.id, type="github", external_url="https://github.com/x/y"
     )
     db_session.add(link)
     db_session.flush()
@@ -108,7 +108,7 @@ def test_viewer_cannot_delete(client, auth_headers, draft_submission, db_session
     headers, viewer = auth_headers(role="viewer")
     _, _, sub = draft_submission(created_by=viewer.id)
     link = SubmissionArtifact(
-        submission_id=sub.id, type="video_link", external_url="https://loom.com/x"
+        submission_id=sub.id, type="loom", external_url="https://loom.com/x"
     )
     db_session.add(link)
     db_session.flush()

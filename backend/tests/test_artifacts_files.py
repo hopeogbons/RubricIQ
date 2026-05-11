@@ -46,17 +46,18 @@ def test_admin_uploads_screenshot(client, auth_headers, draft_submission):
     assert body[0]["size_bytes"] == len(b"PNGDATA")
 
 
-def test_video_file_extensions_accepted(client, auth_headers, draft_submission):
+def test_video_file_upload_rejected(client, auth_headers, draft_submission):
+    """Direct video file uploads are no longer accepted; videos come in as Loom
+    or Google Drive links."""
     headers, admin = auth_headers(role="admin")
     _, _, sub = draft_submission(created_by=admin.id)
-    for name in ("a.mp4", "b.mov", "c.webm"):
-        r = client.post(
-            f"/submissions/{sub.id}/artifacts",
-            headers=headers,
-            data={"type": "video_file"},
-            files=[_file(name, b"VID")],
-        )
-        assert r.status_code == 201, f"{name}: {r.text}"
+    r = client.post(
+        f"/submissions/{sub.id}/artifacts",
+        headers=headers,
+        data={"type": "video_file"},
+        files=[_file("a.mp4", b"VID", "video/mp4")],
+    )
+    assert r.status_code == 422
 
 
 def test_disallowed_extension_rejected(client, auth_headers, draft_submission):
@@ -151,7 +152,7 @@ def test_duplicate_filename_rejected(client, auth_headers, draft_submission):
     assert r.status_code == 400
 
 
-def test_upload_to_non_draft_returns_409(
+def test_upload_to_processing_returns_409(
     client, auth_headers, draft_submission, db_session
 ):
     headers, admin = auth_headers(role="admin")
@@ -165,6 +166,24 @@ def test_upload_to_non_draft_returns_409(
         files=[_file("x.png", b"x")],
     )
     assert r.status_code == 409
+
+
+def test_upload_to_complete_submission_allowed(
+    client, auth_headers, draft_submission, db_session
+):
+    """Editing artifacts on a complete submission is allowed so the evaluator
+    can iterate before re-running n8n."""
+    headers, admin = auth_headers(role="admin")
+    _, _, sub = draft_submission(created_by=admin.id)
+    sub.status = "complete"
+    db_session.flush()
+    r = client.post(
+        f"/submissions/{sub.id}/artifacts",
+        headers=headers,
+        data={"type": "screenshot"},
+        files=[_file("x.png", b"x")],
+    )
+    assert r.status_code == 201
 
 
 def test_viewer_cannot_upload(client, auth_headers, draft_submission):

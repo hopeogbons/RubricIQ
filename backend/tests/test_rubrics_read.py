@@ -92,21 +92,23 @@ def test_detail_out_of_scope_returns_404(client, auth_headers, make_user, make_r
 def test_detail_includes_stats(
     client, auth_headers, make_rubric, db_session
 ):
+    """One submission per learner; two learners give two submissions for the stats."""
     headers, admin = auth_headers(role="admin")
     rub = make_rubric(created_by=admin.id)
-    learner = Learner(rubric_id=rub.id, full_name="L")
-    db_session.add(learner)
+    learner_a = Learner(rubric_id=rub.id, full_name="A")
+    learner_b = Learner(rubric_id=rub.id, full_name="B")
+    db_session.add_all([learner_a, learner_b])
     db_session.flush()
     db_session.add_all([
-        Submission(learner_id=learner.id, rubric_id=rub.id, status="complete"),
-        Submission(learner_id=learner.id, rubric_id=rub.id, status="draft"),
+        Submission(learner_id=learner_a.id, rubric_id=rub.id, status="complete"),
+        Submission(learner_id=learner_b.id, rubric_id=rub.id, status="draft"),
     ])
     db_session.flush()
 
     response = client.get(f"/rubrics/{rub.id}", headers=headers)
     assert response.status_code == 200
     body = response.json()
-    assert body["learner_count"] == 1
+    assert body["learner_count"] == 2
     assert body["submission_count"] == 2
     assert body["completion_rate"] == 0.5
 

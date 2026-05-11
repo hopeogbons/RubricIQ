@@ -5,15 +5,16 @@ from app.models import Evaluation, Learner, Rubric
 
 
 def _seed_rubric_with_submissions(db, *, statuses: list[str]) -> Rubric:
+    """One learner per submission since submissions.learner_id is unique."""
+    from app.models import Submission
+
     rub = Rubric(unique_name=f"r-{uuid.uuid4().hex[:8]}", display_name="R")
     db.add(rub)
     db.flush()
-    learner = Learner(rubric_id=rub.id, full_name="L")
-    db.add(learner)
-    db.flush()
-    from app.models import Submission
-
-    for status in statuses:
+    for idx, status in enumerate(statuses):
+        learner = Learner(rubric_id=rub.id, full_name=f"L{idx}")
+        db.add(learner)
+        db.flush()
         db.add(
             Submission(
                 learner_id=learner.id,
@@ -51,7 +52,7 @@ def test_global_stats_counts_and_completion_rate(client, auth_headers, db_sessio
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["total_rubrics"] == 2
-    assert body["total_learners"] == 2
+    assert body["total_learners"] == 5  # one learner per submission under the new rule
     assert body["total_submissions"] == 5
     # 3 of 5 complete -> 0.6
     assert body["completion_rate"] == 0.6

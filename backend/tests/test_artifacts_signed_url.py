@@ -103,7 +103,7 @@ def test_token_for_link_artifact_does_not_resolve(
     headers, admin = auth_headers(role="admin")
     _, _, sub = draft_submission(created_by=admin.id)
     link = SubmissionArtifact(
-        submission_id=sub.id, type="video_link", external_url="https://loom.com/x"
+        submission_id=sub.id, type="loom", external_url="https://loom.com/x"
     )
     db_session.add(link)
     db_session.flush()
