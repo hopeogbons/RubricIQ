@@ -38,18 +38,32 @@ export function NavBar(): JSX.Element {
                 Rubrics
               </NavLink>
               {user && isAdminRole(user.role) ? (
-                <NavLink
-                  to="/dashboard"
-                  data-testid="nav-dashboard-link"
-                  className={({ isActive }) =>
-                    cn(
-                      "text-muted-foreground hover:text-foreground",
-                      isActive && "text-foreground",
-                    )
-                  }
-                >
-                  Dashboard
-                </NavLink>
+                <>
+                  <NavLink
+                    to="/dashboard"
+                    data-testid="nav-dashboard-link"
+                    className={({ isActive }) =>
+                      cn(
+                        "text-muted-foreground hover:text-foreground",
+                        isActive && "text-foreground",
+                      )
+                    }
+                  >
+                    Dashboard
+                  </NavLink>
+                  <NavLink
+                    to="/admin/users"
+                    data-testid="nav-admin-link"
+                    className={({ isActive }) =>
+                      cn(
+                        "text-muted-foreground hover:text-foreground",
+                        isActive && "text-foreground",
+                      )
+                    }
+                  >
+                    Users
+                  </NavLink>
+                </>
               ) : null}
             </nav>
           ) : null}
