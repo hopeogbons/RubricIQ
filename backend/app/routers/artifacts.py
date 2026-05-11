@@ -78,12 +78,12 @@ def upload_files(
 ) -> list[SubmissionArtifact]:
     if type not in ALLOWED_EXTENSIONS:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"type must be one of {sorted(ALLOWED_EXTENSIONS)}",
         )
     if not files:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No files provided"
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No files provided"
         )
 
     submission = _get_writable_submission(submission_id, user, db)
@@ -99,14 +99,14 @@ def upload_files(
     for upload in files:
         if not upload.filename:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="One of the uploaded files has no name",
             )
         filename = _safe_filename(upload.filename)
         ext = PurePath(filename).suffix.lower()
         if ext not in allowed_exts:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=f"Extension {ext or '(none)'} not allowed for type {type}",
             )
         if storage.exists(submission.id, filename):
@@ -121,13 +121,13 @@ def upload_files(
             )
         except FileTooLargeError as exc:
             raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail=str(exc)
             ) from exc
 
         if existing_total + written > settings.max_submission_bytes:
             storage.delete_file(submission.id, filename)
             raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                 detail=(
                     f"Adding this file would exceed the per-submission limit of "
                     f"{settings.max_submission_bytes} bytes"
