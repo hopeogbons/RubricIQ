@@ -1,9 +1,22 @@
+import { lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { CriterionAveragesChart } from "@/components/charts/CriterionAveragesChart";
-import { ScoreHistogram } from "@/components/charts/ScoreHistogram";
+// Charts pull in Recharts (~400 KB minified); lazy-load them so the main
+// app bundle stays small and the network request happens only when the
+// rubric detail page actually mounts.
+const ScoreHistogram = lazy(() =>
+  import("@/components/charts/ScoreHistogram").then((m) => ({
+    default: m.ScoreHistogram,
+  })),
+);
+const CriterionAveragesChart = lazy(() =>
+  import("@/components/charts/CriterionAveragesChart").then((m) => ({
+    default: m.CriterionAveragesChart,
+  })),
+);
+
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -285,7 +298,11 @@ function ChartsSection({ rubricId }: { rubricId: string }): JSX.Element {
           ) : isLoading || !data ? (
             <Skeleton className="h-64 w-full" data-testid="histogram-loading" />
           ) : (
-            <ScoreHistogram buckets={data.score_distribution} />
+            <Suspense
+              fallback={<Skeleton className="h-64 w-full" data-testid="histogram-loading" />}
+            >
+              <ScoreHistogram buckets={data.score_distribution} />
+            </Suspense>
           )}
         </CardContent>
       </Card>
@@ -300,7 +317,11 @@ function ChartsSection({ rubricId }: { rubricId: string }): JSX.Element {
           {error ? null : isLoading || !data ? (
             <Skeleton className="h-64 w-full" data-testid="criterion-loading" />
           ) : (
-            <CriterionAveragesChart averages={data.criterion_averages} />
+            <Suspense
+              fallback={<Skeleton className="h-64 w-full" data-testid="criterion-loading" />}
+            >
+              <CriterionAveragesChart averages={data.criterion_averages} />
+            </Suspense>
           )}
         </CardContent>
       </Card>
